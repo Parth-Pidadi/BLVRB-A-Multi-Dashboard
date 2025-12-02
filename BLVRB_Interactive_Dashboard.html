@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BLVRB/BLVRA Multi-Omics Interactive Dashboard</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .task-selector {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .task-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            padding: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 3px solid transparent;
+            text-align: center;
+        }
+
+        .task-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .task-card.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #764ba2;
+        }
+
+        .task-card h2 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+
+        .task-card p {
+            font-size: 1em;
+            opacity: 0.8;
+        }
+
+        .plot-selector {
+            display: none;
+            margin-bottom: 30px;
+        }
+
+        .plot-selector.active {
+            display: block;
+        }
+
+        .plot-selector h3 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .plot-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .plot-btn {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 15px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .plot-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .plot-btn.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .visualization-container {
+            display: none;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .visualization-container.active {
+            display: block;
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.9em;
+        }
+
+        .control-group select {
+            padding: 10px 15px;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            background: white;
+        }
+
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid #E74C3C;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            background: white;
+            color: #E74C3C;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn:hover {
+            background: #E74C3C;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .filter-btn.active {
+            background: #E74C3C;
+            color: white;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        #chart {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 600px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 300px;
+            font-size: 0.9em;
+            z-index: 1000;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .tooltip-row {
+            margin: 5px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .tooltip-row:last-child {
+            border-bottom: none;
+        }
+
+        .tooltip-label {
+            font-weight: bold;
+            color: #667eea;
+            display: inline-block;
+            min-width: 120px;
+        }
+
+        .tooltip-value {
+            color: #fff;
+        }
+
+        .axis-label {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #333;
+        }
+
+        .legend {
+            font-size: 12px;
+        }
+
+        .legend-item {
+            cursor: pointer;
+        }
+
+        .legend-item:hover {
+            opacity: 0.7;
+        }
+
+        .data-point {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .data-point:hover {
+            stroke: #000;
+            stroke-width: 2px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .error-message {
+            background: #ff6b6b;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .stats-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .stat-card h4 {
+            color: #667eea;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .task-selector {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧬 BLVRB/BLVRA Multi-Omics Dashboard</h1>
+            <p>Interactive Visualization of Breast Cancer Synthetic Lethality Analysis</p>
+        </div>
+
+        <div class="content">
+            <!-- Task Selector -->
+            <div class="task-selector">
+                <div class="task-card" data-task="task1">
+                    <h2>📊 Task 1</h2>
+                    <p>Breast Cancer-Specific Analysis</p>
+                    <small>BLVRB/BLVRA in Breast Cancer Cell Lines</small>
+                    <br><strong style="color: #667eea; margin-top: 10px; display: block;">6 Visualizations</strong>
+                </div>
+                <div class="task-card" data-task="task2">
+                    <h2>🌍 Task 2</h2>
+                    <p>Pan-Cancer Analysis</p>
+                    <small>BLVRB/BLVRA Across All Cancer Types</small>
+                    <br><strong style="color: #667eea; margin-top: 10px; display: block;">4 Visualizations</strong>
+                </div>
+                <div class="task-card" data-task="task3">
+                    <h2>🔬 Task 3</h2>
+                    <p>Multi-Omics Integration</p>
+                    <small>RNA, Protein, Dependency & Effect</small>
+                    <br><strong style="color: #667eea; margin-top: 10px; display: block;">12 Visualizations</strong>
+                </div>
+            </div>
+
+            <!-- Plot Selectors -->
+            <div id="task1-plots" class="plot-selector">
+                <h3>Select Visualization (6 plots available):</h3>
+                <div class="plot-buttons">
+                    <button class="plot-btn" data-plot="dep-boxplot">1. BLVRB Dependency Boxplot</button>
+                    <button class="plot-btn" data-plot="dep-violin">2. BLVRB Dependency Violin</button>
+                    <button class="plot-btn" data-plot="dep-vs-eff">3. Dependency vs Effect</button>
+                    <button class="plot-btn" data-plot="blvrb-vs-blvra-dep">4. BLVRB vs BLVRA Comparison</button>
+                    <button class="plot-btn" data-plot="dep-histogram">5. Dependency Distribution</button>
+                    <button class="plot-btn" data-plot="blvrb-vs-blvra-eff">6. BLVRB vs BLVRA Effect</button>
+                </div>
+            </div>
+
+            <div id="task2-plots" class="plot-selector">
+                <h3>Select Visualization (4 plots available):</h3>
+                <div class="plot-buttons">
+                    <button class="plot-btn" data-plot="dep-by-cancer">1. Dependency by Cancer Type</button>
+                    <button class="plot-btn" data-plot="dep-vs-eff-all">2. Dependency vs Effect (All)</button>
+                    <button class="plot-btn" data-plot="dep-heatmap">3. Dependency Heatmap</button>
+                    <button class="plot-btn" data-plot="dep-ranked">4. Ranked Cancer Types</button>
+                </div>
+            </div>
+
+            <div id="task3-plots" class="plot-selector">
+                <h3>Select Visualization (12 plots available):</h3>
+                <div class="plot-buttons">
+                    <button class="plot-btn" data-plot="rna-vs-protein">1. RNA vs Protein</button>
+                    <button class="plot-btn" data-plot="rna-vs-dep">2. RNA vs Dependency</button>
+                    <button class="plot-btn" data-plot="protein-vs-dep">3. Protein vs Dependency</button>
+                    <button class="plot-btn" data-plot="dep-vs-eff-multi">4. Dependency vs Effect</button>
+                    <button class="plot-btn" data-plot="rna-distribution">5. RNA Distribution</button>
+                    <button class="plot-btn" data-plot="protein-distribution">6. Protein Distribution</button>
+                    <button class="plot-btn" data-plot="rna-by-cancer">7. RNA by Cancer Type</button>
+                    <button class="plot-btn" data-plot="protein-by-cancer">8. Protein by Cancer Type</button>
+                    <button class="plot-btn" data-plot="rna-dep-all-cancers">9. RNA vs Dep (All Cancers)</button>
+                    <button class="plot-btn" data-plot="protein-dep-all-cancers">10. Protein vs Dep (All Cancers)</button>
+                    <button class="plot-btn" data-plot="dep-by-cancer-type">11. Dependency by Cancer Type</button>
+                    <button class="plot-btn" data-plot="multiomics-overview">12. Multi-Omics Overview</button>
+                </div>
+            </div>
+
+            <!-- Visualization Container -->
+            <div class="visualization-container">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="x-axis">X-Axis:</label>
+                        <select id="x-axis"></select>
+                    </div>
+                    <div class="control-group">
+                        <label for="y-axis">Y-Axis:</label>
+                        <select id="y-axis"></select>
+                    </div>
+                    <div class="control-group" id="color-control" style="display: none;">
+                        <label for="color-by">Color By:</label>
+                        <select id="color-by"></select>
+                    </div>
+                    <div class="control-group">
+                        <label>&nbsp;</label>
+                        <button id="breast-filter-btn" class="filter-btn">
+                            🎯 Highlight Breast Cancer
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-panel" id="stats-panel"></div>
+
+                <div id="chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip"></div>
+
+    <script>
+        // Global variables
+        let currentTask = null;
+        let currentPlot = null;
+        let currentData = null;
+        let svg = null;
+        let breastFilterActive = false;
+        const margin = { top: 40, right: 150, bottom: 80, left: 80 };
+
+        // Color schemes
+        const colors = {
+            breast: '#E74C3C',
+            other: '#95A5A6',
+            blvrb: '#3498DB',
+            blvra: '#2ECC71'
+        };
+
+        // Task selection
+        document.querySelectorAll('.task-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const task = this.dataset.task;
+                selectTask(task);
+            });
+        });
+
+        function selectTask(task) {
+            currentTask = task;
+            
+            // Update task cards
+            document.querySelectorAll('.task-card').forEach(c => c.classList.remove('active'));
+            document.querySelector(`[data-task="${task}"]`).classList.add('active');
+            
+            // Show appropriate plot selector
+            document.querySelectorAll('.plot-selector').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${task}-plots`).classList.add('active');
+            
+            // Hide visualization
+            document.querySelector('.visualization-container').classList.remove('active');
+            
+            // Load data
+            loadData(task);
+        }
+
+        // Plot selection
+        document.querySelectorAll('.plot-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const plot = this.dataset.plot;
+                const task = this.closest('.plot-selector').id.replace('-plots', '');
+                
+                // Update active button
+                this.closest('.plot-buttons').querySelectorAll('.plot-btn').forEach(b => 
+                    b.classList.remove('active'));
+                this.classList.add('active');
+                
+                selectPlot(task, plot);
+            });
+        });
+
+        // Breast cancer filter button
+        document.addEventListener('DOMContentLoaded', function() {
+            const breastFilterBtn = document.getElementById('breast-filter-btn');
+            if (breastFilterBtn) {
+                breastFilterBtn.addEventListener('click', function() {
+                    breastFilterActive = !breastFilterActive;
+                    this.classList.toggle('active');
+                    
+                    if (breastFilterActive) {
+                        this.innerHTML = '✓ Breast Cancer Highlighted';
+                    } else {
+                        this.innerHTML = '🎯 Highlight Breast Cancer';
+                    }
+                    
+                    // Re-render the current plot with filter
+                    if (currentTask && currentPlot && currentData) {
+                        renderVisualization(currentTask, currentPlot, currentData);
+                    }
+                });
+            }
+        });
+
+        function selectPlot(task, plot) {
+            currentPlot = plot;
+            document.querySelector('.visualization-container').classList.add('active');
+            
+            if (currentData) {
+                renderVisualization(task, plot, currentData);
+            }
+        }
+
+        // Load data
+        async function loadData(task) {
+            try {
+                document.getElementById('chart').innerHTML = '<div class="loading">Loading data...</div>';
+                
+                const filename = task === 'task1' ? 'Task1_Breast_BLVRB_BLVRA.csv' :
+                                task === 'task2' ? 'Task2_AllCancer_BLVRB_BLVRA.csv' :
+                                'Task3_BLVRB_Integrated_MultiOmics.csv';
+                
+                // Note: Update this path to match your actual file location
+                const response = await d3.csv(filename);
+                currentData = response;
+                
+                console.log('Data loaded:', currentData.length, 'rows');
+                
+                if (currentPlot) {
+                    renderVisualization(task, currentPlot, currentData);
+                }
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('chart').innerHTML = 
+                    '<div class="error-message">Error loading data. Please make sure the CSV files are in the correct location.</div>';
+            }
+        }
+
+        // Render visualization
+        function renderVisualization(task, plot, data) {
+            // Clear previous chart
+            d3.select('#chart').html('');
+            
+            // Get plot configuration
+            const config = getPlotConfig(task, plot);
+            
+            // Setup axes controls
+            setupAxisControls(config, data);
+            
+            // Render statistics
+            renderStatistics(data, config);
+            
+            // Create scatter plot
+            createScatterPlot(data, config);
+        }
+
+        function getPlotConfig(task, plot) {
+            const configs = {
+                'task1': {
+                    'dep-boxplot': {
+                        title: 'BLVRB Dependency in Breast Cancer Cell Lines (Boxplot)',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-violin': {
+                        title: 'BLVRB Dependency Distribution in Breast Cancer (Violin)',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-vs-eff': {
+                        title: 'BLVRB Dependency vs Effect (Breast Cancer)',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'blvrb-vs-blvra-dep': {
+                        title: 'BLVRB vs BLVRA Dependency in Breast Cancer',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRA_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-histogram': {
+                        title: 'Distribution of BLVRB Dependency in Breast Cancer',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'blvrb-vs-blvra-eff': {
+                        title: 'BLVRB vs BLVRA Effect Scores in Breast Cancer',
+                        xAxis: 'BLVRB_effect',
+                        yAxis: 'BLVRA_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    }
+                },
+                'task2': {
+                    'dep-by-cancer': {
+                        title: 'BLVRB Dependency Across Cancer Types',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-vs-eff-all': {
+                        title: 'BLVRB Dependency vs Effect (All Cancer Types)',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-heatmap': {
+                        title: 'Mean BLVRB Dependency by Cancer Type',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRA_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-ranked': {
+                        title: 'Cancer Types Ranked by BLVRB Dependency',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    }
+                },
+                'task3': {
+                    'rna-vs-protein': {
+                        title: 'BLVRB RNA vs Protein Expression',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_Protein',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'rna-vs-dep': {
+                        title: 'BLVRB RNA Expression vs Dependency',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'protein-vs-dep': {
+                        title: 'BLVRB Protein Abundance vs Dependency',
+                        xAxis: 'BLVRB_Protein',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-vs-eff-multi': {
+                        title: 'BLVRB Dependency vs Effect Score',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'rna-distribution': {
+                        title: 'BLVRB RNA Expression Distribution',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'protein-distribution': {
+                        title: 'BLVRB Protein Abundance Distribution',
+                        xAxis: 'BLVRB_Protein',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'rna-by-cancer': {
+                        title: 'BLVRB RNA Expression Across Cancer Types',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_Protein',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'protein-by-cancer': {
+                        title: 'BLVRB Protein Abundance Across Cancer Types',
+                        xAxis: 'BLVRB_Protein',
+                        yAxis: 'BLVRB_RNA',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'rna-dep-all-cancers': {
+                        title: 'BLVRB RNA Expression Influences Dependency (All Cancer Types)',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'protein-dep-all-cancers': {
+                        title: 'BLVRB Protein Level Influences Dependency (All Cancer Types)',
+                        xAxis: 'BLVRB_Protein',
+                        yAxis: 'BLVRB_dependency',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'dep-by-cancer-type': {
+                        title: 'BLVRB Dependency by Cancer Type',
+                        xAxis: 'BLVRB_dependency',
+                        yAxis: 'BLVRB_effect',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    },
+                    'multiomics-overview': {
+                        title: 'Multi-Omics Overview: RNA, Protein, Dependency',
+                        xAxis: 'BLVRB_RNA',
+                        yAxis: 'BLVRB_Protein',
+                        colorBy: 'OncotreeLineage',
+                        label: 'StrippedCellLineName',
+                        plotType: 'scatter'
+                    }
+                }
+            };
+            
+            return configs[task][plot];
+        }
+
+        function setupAxisControls(config, data) {
+            const numericColumns = Object.keys(data[0]).filter(key => {
+                const val = data[0][key];
+                return !isNaN(parseFloat(val)) && isFinite(val);
+            });
+            
+            const categoricalColumns = Object.keys(data[0]).filter(key => {
+                const val = data[0][key];
+                return isNaN(parseFloat(val)) || !isFinite(val);
+            });
+            
+            // Populate X-axis selector
+            const xSelect = document.getElementById('x-axis');
+            xSelect.innerHTML = numericColumns.map(col => 
+                `<option value="${col}" ${col === config.xAxis ? 'selected' : ''}>${col}</option>`
+            ).join('');
+            
+            // Populate Y-axis selector
+            const ySelect = document.getElementById('y-axis');
+            ySelect.innerHTML = numericColumns.map(col => 
+                `<option value="${col}" ${col === config.yAxis ? 'selected' : ''}>${col}</option>`
+            ).join('');
+            
+            // Populate Color-by selector
+            const colorSelect = document.getElementById('color-by');
+            const colorControl = document.getElementById('color-control');
+            
+            if (categoricalColumns.length > 0) {
+                colorControl.style.display = 'flex';
+                colorSelect.innerHTML = categoricalColumns.map(col => 
+                    `<option value="${col}" ${col === config.colorBy ? 'selected' : ''}>${col}</option>`
+                ).join('');
+            }
+            
+            // Add event listeners
+            xSelect.onchange = () => {
+                config.xAxis = xSelect.value;
+                createScatterPlot(data, config);
+            };
+            
+            ySelect.onchange = () => {
+                config.yAxis = ySelect.value;
+                createScatterPlot(data, config);
+            };
+            
+            colorSelect.onchange = () => {
+                config.colorBy = colorSelect.value;
+                createScatterPlot(data, config);
+            };
+        }
+
+        function renderStatistics(data, config) {
+            const statsPanel = document.getElementById('stats-panel');
+            
+            // Calculate statistics for current axes
+            const xValues = data.map(d => parseFloat(d[config.xAxis])).filter(v => !isNaN(v));
+            const yValues = data.map(d => parseFloat(d[config.yAxis])).filter(v => !isNaN(v));
+            
+            const xMean = d3.mean(xValues);
+            const yMean = d3.mean(yValues);
+            const correlation = calculateCorrelation(xValues, yValues);
+            
+            statsPanel.innerHTML = `
+                <div class="stat-card">
+                    <h4>Data Points</h4>
+                    <div class="value">${data.length}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>${config.xAxis} Mean</h4>
+                    <div class="value">${xMean ? xMean.toFixed(3) : 'N/A'}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>${config.yAxis} Mean</h4>
+                    <div class="value">${yMean ? yMean.toFixed(3) : 'N/A'}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Correlation (r)</h4>
+                    <div class="value">${correlation ? correlation.toFixed(3) : 'N/A'}</div>
+                </div>
+            `;
+        }
+
+        function calculateCorrelation(x, y) {
+            const n = Math.min(x.length, y.length);
+            if (n < 2) return null;
+            
+            const xMean = d3.mean(x);
+            const yMean = d3.mean(y);
+            
+            let numerator = 0;
+            let xDenominator = 0;
+            let yDenominator = 0;
+            
+            for (let i = 0; i < n; i++) {
+                const xDiff = x[i] - xMean;
+                const yDiff = y[i] - yMean;
+                numerator += xDiff * yDiff;
+                xDenominator += xDiff * xDiff;
+                yDenominator += yDiff * yDiff;
+            }
+            
+            return numerator / Math.sqrt(xDenominator * yDenominator);
+        }
+
+        function createScatterPlot(data, config) {
+            const container = document.getElementById('chart');
+            const width = container.clientWidth - margin.left - margin.right;
+            const height = 600 - margin.top - margin.bottom;
+            
+            // Clear previous chart
+            d3.select('#chart').html('');
+            
+            // Filter valid data
+            const validData = data.filter(d => {
+                const x = parseFloat(d[config.xAxis]);
+                const y = parseFloat(d[config.yAxis]);
+                return !isNaN(x) && !isNaN(y) && isFinite(x) && isFinite(y);
+            });
+            
+            if (validData.length === 0) {
+                container.innerHTML = '<div class="error-message">No valid data points for selected axes.</div>';
+                return;
+            }
+            
+            // Create SVG
+            svg = d3.select('#chart')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+            
+            // Create scales
+            const xScale = d3.scaleLinear()
+                .domain(d3.extent(validData, d => parseFloat(d[config.xAxis])))
+                .range([0, width])
+                .nice();
+            
+            const yScale = d3.scaleLinear()
+                .domain(d3.extent(validData, d => parseFloat(d[config.yAxis])))
+                .range([height, 0])
+                .nice();
+            
+            // Color scale
+            const colorCategories = [...new Set(validData.map(d => d[config.colorBy]))];
+            const colorScale = d3.scaleOrdinal()
+                .domain(colorCategories)
+                .range(colorCategories.map((cat, i) => {
+                    if (cat === 'Breast') return colors.breast;
+                    return d3.schemeCategory10[i % 10];
+                }));
+            
+            // Add axes
+            const xAxis = d3.axisBottom(xScale);
+            const yAxis = d3.axisLeft(yScale);
+            
+            svg.append('g')
+                .attr('transform', `translate(0,${height})`)
+                .call(xAxis)
+                .append('text')
+                .attr('class', 'axis-label')
+                .attr('x', width / 2)
+                .attr('y', 45)
+                .text(config.xAxis);
+            
+            svg.append('g')
+                .call(yAxis)
+                .append('text')
+                .attr('class', 'axis-label')
+                .attr('transform', 'rotate(-90)')
+                .attr('x', -height / 2)
+                .attr('y', -55)
+                .text(config.yAxis);
+            
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', -10)
+                .attr('text-anchor', 'middle')
+                .style('font-size', '18px')
+                .style('font-weight', 'bold')
+                .text(config.title);
+            
+            // Add grid
+            svg.append('g')
+                .attr('class', 'grid')
+                .attr('opacity', 0.1)
+                .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(''));
+            
+            svg.append('g')
+                .attr('class', 'grid')
+                .attr('opacity', 0.1)
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).tickSize(-height).tickFormat(''));
+            
+            // Add reference lines at 0
+            if (xScale.domain()[0] < 0 && xScale.domain()[1] > 0) {
+                svg.append('line')
+                    .attr('x1', xScale(0))
+                    .attr('x2', xScale(0))
+                    .attr('y1', 0)
+                    .attr('y2', height)
+                    .attr('stroke', 'black')
+                    .attr('stroke-width', 1)
+                    .attr('opacity', 0.3);
+            }
+            
+            if (yScale.domain()[0] < 0 && yScale.domain()[1] > 0) {
+                svg.append('line')
+                    .attr('x1', 0)
+                    .attr('x2', width)
+                    .attr('y1', yScale(0))
+                    .attr('y2', yScale(0))
+                    .attr('stroke', 'black')
+                    .attr('stroke-width', 1)
+                    .attr('opacity', 0.3);
+            }
+            
+            // Create tooltip
+            const tooltip = d3.select('.tooltip');
+            
+            // Add data points
+            svg.selectAll('.data-point')
+                .data(validData)
+                .enter()
+                .append('circle')
+                .attr('class', 'data-point')
+                .attr('cx', d => xScale(parseFloat(d[config.xAxis])))
+                .attr('cy', d => yScale(parseFloat(d[config.yAxis])))
+                .attr('r', d => {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    return isBreast ? 6 : 4;
+                })
+                .attr('fill', d => colorScale(d[config.colorBy]))
+                .attr('opacity', d => {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    if (breastFilterActive) {
+                        return isBreast ? 0.9 : 0.1;
+                    }
+                    return isBreast ? 0.8 : 0.5;
+                })
+                .attr('stroke', d => {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    return isBreast ? '#000' : 'none';
+                })
+                .attr('stroke-width', d => {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    return isBreast ? 1.5 : 0;
+                })
+                .on('mouseover', function(event, d) {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr('r', isBreast ? 10 : 8)
+                        .attr('opacity', 1)
+                        .attr('stroke', '#000')
+                        .attr('stroke-width', 2);
+                    
+                    // Build tooltip content
+                    let tooltipContent = `<div class="tooltip-row">
+                        <span class="tooltip-label">Cell Line:</span>
+                        <span class="tooltip-value">${d[config.label] || 'N/A'}</span>
+                    </div>`;
+                    
+                    // Add all available information
+                    Object.keys(d).forEach(key => {
+                        if (key !== config.label) {
+                            tooltipContent += `<div class="tooltip-row">
+                                <span class="tooltip-label">${key}:</span>
+                                <span class="tooltip-value">${d[key] || 'N/A'}</span>
+                            </div>`;
+                        }
+                    });
+                    
+                    tooltip
+                        .html(tooltipContent)
+                        .classed('show', true)
+                        .style('left', (event.pageX + 15) + 'px')
+                        .style('top', (event.pageY - 15) + 'px');
+                })
+                .on('mouseout', function(event, d) {
+                    const isBreast = d[config.colorBy] === 'Breast' || d['OncotreeLineage'] === 'Breast';
+                    
+                    d3.select(this)
+                        .transition()
+                        .duration(200)
+                        .attr('r', isBreast ? 6 : 4)
+                        .attr('opacity', () => {
+                            if (breastFilterActive) {
+                                return isBreast ? 0.9 : 0.1;
+                            }
+                            return isBreast ? 0.8 : 0.5;
+                        })
+                        .attr('stroke', isBreast ? '#000' : 'none')
+                        .attr('stroke-width', isBreast ? 1.5 : 0);
+                    
+                    tooltip.classed('show', false);
+                });
+            
+            // Add legend
+            const legend = svg.append('g')
+                .attr('class', 'legend')
+                .attr('transform', `translate(${width + 20}, 20)`);
+            
+            const legendItems = colorCategories.slice(0, 10); // Limit to 10 items
+            
+            legendItems.forEach((category, i) => {
+                const legendItem = legend.append('g')
+                    .attr('class', 'legend-item')
+                    .attr('transform', `translate(0, ${i * 25})`);
+                
+                legendItem.append('circle')
+                    .attr('r', 5)
+                    .attr('fill', colorScale(category))
+                    .attr('opacity', 0.7);
+                
+                legendItem.append('text')
+                    .attr('x', 15)
+                    .attr('y', 5)
+                    .text(category.length > 15 ? category.substring(0, 15) + '...' : category)
+                    .style('font-size', '12px');
+            });
+            
+            if (colorCategories.length > 10) {
+                legend.append('text')
+                    .attr('y', legendItems.length * 25 + 10)
+                    .text(`... and ${colorCategories.length - 10} more`)
+                    .style('font-size', '11px')
+                    .style('font-style', 'italic')
+                    .attr('opacity', 0.7);
+            }
+        }
+
+        // Initialize
+        console.log('Dashboard initialized. Select a task to begin.');
+    </script>
+</body>
+</html>
